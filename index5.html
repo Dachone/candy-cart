@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Candy Cart with Editable Stock & Cart</title>
+  <style>
+    body { font-family: Arial; padding: 20px; max-width: 1000px; margin: auto; }
+    .product-grid { display: flex; flex-wrap: wrap; gap: 20px; }
+    .product {
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: 200px;
+      text-align: center;
+      border-radius: 8px;
+      position: relative;
+    }
+    .product img { max-width: 100%; height: 100px; object-fit: cover; }
+    .product input[type="number"] { width: 60px; text-align: center; margin: 5px; }
+    .out-of-stock-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.9);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 4rem;
+      color: red;
+      font-weight: bold;
+      border-radius: 8px;
+      user-select: none;
+    }
+    #cartList li {
+      margin-bottom: 5px;
+      font-size: 1rem;
+    }
+    .total { font-size: 1.3rem; font-weight: bold; margin-top: 10px; }
+    #controls { margin-top: 15px; display: flex; gap: 10px; }
+    #controls button { padding: 8px 14px; font-size: 1rem; cursor: pointer; }
+    #cartList button { margin-left: 8px; padding: 2px 6px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<h2>🍬 Candy Cart (Editable Stock + Full Cart & Controls)</h2>
+
+<div class="product-grid" id="productGrid"></div>
+
+<h3>🛒 Cart</h3>
+<ul id="cartList"></ul>
+<p class="total">Total: $<span id="total">0.00</span></p>
+
+<div id="controls">
+  <button id="checkoutBtn">💳 Checkout</button>
+  <button id="restockBtn">🔄 Restock All</button>
+</div>
+
+<script>
+const originalProducts = [
+  { name: "JOLLY RANCHER 7for1$", price: 0.15, stock: 15, image: "https://tse1.mm.bing.net/th/id/OIP.eqLw1wDF9BjT6VWakX0wuAHaHa?rs=1&pid=ImgDetMain&o=7&rm=3" },
+  { name: "Airheads", price: 0.50, stock: 20, image: "https://uploads.dailydot.com/2022/10/airheads.jpg?q=65&auto=format&w=2270&ar=2:1&fit=crop" },
+  { name: "Welch's Fruit Snacks", price: 0.50, stock: 12, image: "https://i.pinimg.com/originals/f7/32/cc/f732cc7958c6656cd8d9daf96d7c9652.jpg" },
+  { name: "Takis", price: 1.00, stock: 8, image: "https://i.etsystatic.com/38128153/r/il/f9445b/4732450641/il_fullxfull.4732450641_3vfa.jpg" },
+  { name: "SOUR PATCH KIDS Watermelon", price: 2.00, stock: 5, image: "https://m.media-amazon.com/images/I/81FYrcGFRfL.jpg" },
+  { name: "SKITTLES Sours", price: 2.00, stock: 10, image: "https://i5.walmartimages.com/asr/0bb0f181-88de-46df-88e8-ced5c60db22b_1.a41b01d7e2407b65bf8005277e98c291.jpeg" },
+  { name: "SWEDISH FISH", price: 1.50, stock: 9, image: "https://meaningfuleats.com/wp-content/uploads/2022/09/gluten-free-swedish-fish.jpg" },
+  { name: "HERSHEY'S", price: 2.00, stock: 14, image: "https://th.bing.com/th/id/R.323ed0e5f9ca67573b1f704a7b3f3e72?rik=xk1ckBRXfHlgQw&riu=http%3a%2f%2fs7d2.scene7.com%2fis%2fimage%2fhersheysassets%2f0_34000_00240_5_701_24000_097_Item_Front%3ffmt%3dpng-alpha%26hei%3d1500&ehk=ZVhZLDh4tbNHoll9PbNA0s7ytV2mZWNoN3W9IlWgjo8%3d&risl=&pid=ImgRaw&r=0" },
+  { name: "KIT KAT", price: 1.50, stock: 11, image: "https://wallpapers.com/images/hd/opened-kit-kat-chocolate-ic05ef6cdkwdz4in.jpg" },
+  { name: "REESE'S", price: 2.00, stock: 7, image: "https://i5.walmartimages.com/asr/ccb157fa-b043-461c-92c9-efa2d33a0d4e_1.1c2b59765c29a0cc842b2c9de174c5f2.jpeg" },
+  { name: "Airheads Xtremes Belts", price: 2.50, stock: 6, image: "https://m.media-amazon.com/images/I/81jNssNuIBL.jpg" },
+  { name: "Nabisco Cookies Variety Pack", price: 1.00, stock: 13, image: "https://images.freshop.com/00044000074869/fcf61702c947fee4563f7f5215e86b9b_large.png" }
+];
+
+let products = [];
+let cart = [];
+let total = 0;
+
+const productGrid = document.getElementById('productGrid');
+const cartList = document.getElementById('cartList');
+const totalEl = document.getElementById('total');
+
+function loadState() {
+  const sp = localStorage.getItem('products');
+  const sc = localStorage.getItem('cart');
+  const st = localStorage.getItem('total');
+  products = sp ? JSON.parse(sp) : JSON.parse(JSON.stringify(originalProducts));
+  cart = sc ? JSON.parse(sc) : [];
+  total = st ? parseFloat(st) : 0;
+}
+
+function saveState() {
+  localStorage.setItem('products', JSON.stringify(products));
+  localStorage.setItem('cart', JSON.stringify(cart));
+  localStorage.setItem('total', total.toFixed(2));
+}
+
+function renderProducts() {
+  productGrid.innerHTML = '';
+  products.forEach((product, i) => {
+    const out = product.stock <= 0;
+    const dv = document.createElement('div');
+    dv.className = 'product';
+    dv.innerHTML = `
+      <img src="${product.image}" alt="${product.name}">
+      <div><strong>${product.name}</strong></div>
+      <div>💲${product.price.toFixed(2)}</div>
+      <label>Stock: <input type="number" min="0" value="${product.stock}" id="stock-${i}"></label><br>
+      <label>Qty: <input type="number" min="1" value="1" id="qty-${i}" ${out? 'disabled':''}></label><br>
+      <button onclick="addToCart(${i})" ${out? 'disabled':''}>Add to Cart</button>
+      ${out? '<div class="out-of-stock-overlay">X</div>':''}
+    `;
+    productGrid.appendChild(dv);
+    dv.querySelector(`#stock-${i}`).addEventListener('input', e => {
+      const v = parseInt(e.target.value);
+      products[i].stock = isNaN(v)||v<0 ? 0:v;
+      saveState(); renderProducts();
+    });
+  });
+}
+
+function renderCart() {
+  cartList.innerHTML = '';
+  cart.forEach((item, idx) => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+      ${item.name} x ${item.qty} = $${(item.qty*item.price).toFixed(2)}
+      <button onclick="removeOne(${idx})">➖</button>
+    `;
+    cartList.appendChild(li);
+  });
+  totalEl.textContent = total.toFixed(2);
+}
+
+function addToCart(i) {
+  const q = parseInt(document.getElementById(`qty-${i}`).value);
+  if (isNaN(q)||q<1) return alert("Enter valid quantity.");
+  const p = products[i];
+  if (q > p.stock) return alert(`Only ${p.stock} in stock.`);
+  p.stock -= q;
+  const found = cart.find(c=>c.name===p.name);
+  if (found) found.qty += q;
+  else cart.push({ name:p.name, price:p.price, qty:q });
+  total += p.price*q;
+  saveState(); renderProducts(); renderCart();
+}
+
+function removeOne(idx) {
+  const it = cart[idx];
+  const prod = products.find(p=>p.name===it.name);
+  if (prod) prod.stock += 1;
+  it.qty -= 1;
+  total -= it.price;
+  if (it.qty < 1) cart.splice(idx,1);
+  saveState(); renderProducts(); renderCart();
+}
+
+function checkout() {
+  if (!cart.length) return alert("Cart is empty!");
+  if (confirm(`Checkout total $${total.toFixed(2)}?`)) {
+    alert("Thank you!");
+    cart = []; total = 0;
+    saveState();
+    renderProducts(); renderCart();
+  }
+}
+
+function restockAll() {
+  if (confirm("Reset all stock & cart?")) {
+    products = JSON.parse(JSON.stringify(originalProducts));
+    cart=[]; total=0;
+    saveState();
+    renderProducts(); renderCart();
+  }
+}
+
+document.getElementById('checkoutBtn').onclick = checkout;
+document.getElementById('restockBtn').onclick = restockAll;
+
+loadState(); renderProducts(); renderCart();
+</script>
+
+</body>
+</html>
